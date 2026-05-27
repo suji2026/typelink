@@ -1,55 +1,14 @@
 {
-  "name": "voice-input",
+  "name": "typelink",
   "version": "1.0.0",
   "description": "Use phone as voice input for desktop",
-  "main": "main.js",
+  "main": "src-tauri/src/main.rs",
   "scripts": {
-    "start": "electron .",
-    "test": "jest",
-    "pack": "electron-builder --dir",
-    "dist": "electron-builder",
-    "dist:win": "electron-builder --win portable",
-    "dist:mac": "electron-builder --mac zip"
+    "start": "tauri dev",
+    "build": "tauri build"
   },
-  "dependencies": {
-    "@nut-tree-fork/nut-js": "^4.2.0",
-    "clipboardy": "^5.3.1",
-    "express": "^4.21.0",
-    "qrcode": "^1.5.4",
-    "ws": "^8.18.0"
-  },
+  "dependencies": {},
   "devDependencies": {
-    "electron": "^33.0.0",
-    "electron-builder": "^25.1.8",
-    "jest": "^29.7.0"
-  },
-  "build": {
-    "appId": "com.typethin.app",
-    "productName": "TypeThin",
-    "directories": {
-      "output": "dist"
-    },
-    "files": [
-      "main.js",
-      "server.js",
-      "keyboard.js",
-      "public/**/*"
-    ],
-    "win": {
-      "target": [
-        {
-          "target": "portable",
-          "arch": ["x64"]
-        }
-      ],
-      "artifactName": "${productName}-${version}-portable.${ext}",
-      "signAndEditExecutable": false
-    },
-    "portable": {
-      "artifactName": "${productName}-${version}-portable.${ext}"
-    },
-    "electronDownload": {
-      "mirror": "https://npmmirror.com/mirrors/electron/"
-    }
+    "@tauri-apps/cli": "^2.1.0"
   }
 }

@@ -18,17 +18,20 @@ function createTrayIcon(r, g, b) {
       const i = (y * size + x) * 4;
       let isPixelSet = false;
       
-      // 两个 T 并排，顶部横杠连接，横杠加长
-      // 顶部横杠（连接两个 T）- 加长到两端
-      if (y >= 3 && y <= 5 && x >= 2 && x <= 13) {
+      // T 的横杠 (x: 1-7, y: 3-4)
+      if (y >= 3 && y <= 4 && x >= 1 && x <= 7) {
         isPixelSet = true;
       }
-      // 左侧 T 的竖杠
-      if (x >= 4 && x <= 6 && y >= 3 && y <= 12) {
+      // T 的竖杠 (x: 3-4, y: 3-12)
+      if (x >= 3 && x <= 4 && y >= 3 && y <= 12) {
         isPixelSet = true;
       }
-      // 右侧 T 的竖杠
-      if (x >= 9 && x <= 11 && y >= 3 && y <= 12) {
+      // L 的竖杠 (x: 9-10, y: 3-12)
+      if (x >= 9 && x <= 10 && y >= 3 && y <= 12) {
+        isPixelSet = true;
+      }
+      // L 的横杠 (x: 9-14, y: 11-12)
+      if (y >= 11 && y <= 12 && x >= 9 && x <= 14) {
         isPixelSet = true;
       }
       
@@ -72,7 +75,7 @@ function updateMenu() {
   ]);
 
   tray.setContextMenu(menu);
-  tray.setToolTip(connected ? 'TypeThin - 已连接' : 'TypeThin - 等待连接');
+  tray.setToolTip(connected ? 'TypeLink - 已连接' : 'TypeLink - 等待连接');
 }
 
 function showQRWindow() {
@@ -88,7 +91,7 @@ function showQRWindow() {
   qrWindow = new BrowserWindow({
     width: 340,
     height: 420,
-    title: 'TypeThin',
+    title: 'TypeLink',
     icon: windowIcon,
     resizable: false,
     autoHideMenuBar: true,
@@ -136,10 +139,17 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', (e) => {
-  e.preventDefault();
+  if (!app.isQuitting) {
+    e.preventDefault();
+  }
 });
 
 app.on('before-quit', () => {
+  app.isQuitting = true;
+  if (qrWindow) {
+    qrWindow.destroy();
+    qrWindow = null;
+  }
   if (statusInterval) clearInterval(statusInterval);
   if (serverInfo && serverInfo.server) {
     serverInfo.server.close();

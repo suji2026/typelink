@@ -13,7 +13,7 @@
 ## File Structure
 
 ```
-voice-input/                       # Project root (~/typethin)
+voice-input/                       # Project root (~/typelink)
 ├── .gitignore
 ├── desktop/
 │   ├── package.json
