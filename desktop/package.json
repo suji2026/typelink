@@ -5,7 +5,8 @@
   "main": "src-tauri/src/main.rs",
   "scripts": {
     "start": "tauri dev",
-    "build": "tauri build"
+    "build": "tauri build",
+    "tauri": "tauri"
   },
   "dependencies": {},
   "devDependencies": {
