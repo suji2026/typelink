@@ -60,17 +60,24 @@ fn generate_qr_svg(url: &str) -> Result<String, String> {
 fn type_text_via_clipboard(text: &str) {
     if let Ok(mut clipboard) = Clipboard::new() {
         if clipboard.set_text(text).is_ok() {
+            // A short delay to allow macOS clipboard (pasteboard) to settle and sync
+            std::thread::sleep(std::time::Duration::from_millis(100));
+            
             let mut enigo = Enigo::new();
             #[cfg(target_os = "macos")]
             {
                 enigo.key_down(Key::Meta);
+                std::thread::sleep(std::time::Duration::from_millis(50));
                 enigo.key_click(Key::Layout('v'));
+                std::thread::sleep(std::time::Duration::from_millis(50));
                 enigo.key_up(Key::Meta);
             }
             #[cfg(not(target_os = "macos"))]
             {
                 enigo.key_down(Key::Control);
+                std::thread::sleep(std::time::Duration::from_millis(50));
                 enigo.key_click(Key::Layout('v'));
+                std::thread::sleep(std::time::Duration::from_millis(50));
                 enigo.key_up(Key::Control);
             }
         }

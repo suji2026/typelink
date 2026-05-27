@@ -240,6 +240,12 @@
         if (ws && ws.readyState === WebSocket.OPEN) {
           ws.send(JSON.stringify({ type: 'text', payload: text }));
           lastSentText = text;
+          // Clear lastSentText after 3 seconds so the user can send the same text again later
+          setTimeout(function() {
+            if (lastSentText === text) {
+              lastSentText = '';
+            }
+          }, 3000);
           textarea.value = '';
           updateSendBtn();
         }
