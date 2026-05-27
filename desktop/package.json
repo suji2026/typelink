@@ -1,6 +1,6 @@
 {
   "name": "typelink",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Use phone as voice input for desktop",
   "main": "src-tauri/src/main.rs",
   "scripts": {
