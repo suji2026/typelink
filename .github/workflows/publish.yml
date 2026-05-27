@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - master
-  workflow_dispatch: # Allows manual trigger from GitHub Actions UI
+  workflow_dispatch:
 
 jobs:
   publish-tauri:
@@ -15,7 +15,14 @@ jobs:
       matrix:
         include:
           - platform: 'macos-latest'
+            args: '--target aarch64-apple-darwin'
+            arch: 'aarch64'
+          - platform: 'macos-latest'
+            args: '--target x86_64-apple-darwin'
+            arch: 'x64'
           - platform: 'windows-latest'
+            args: ''
+            arch: 'x64'
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -29,19 +36,41 @@ jobs:
       - name: Install Rust Stable
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Install macOS Rust Targets
+        if: matrix.platform == 'macos-latest'
+        run: |
+          rustup target add aarch64-apple-darwin
+          rustup target add x86_64-apple-darwin
+
       - name: Install Frontend Dependencies
         run: |
           cd desktop
           npm install
 
       - name: Build and Publish Tauri Application
+        id: tauri_build
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           projectPath: './desktop'
+          args: ${{ matrix.args }}
           tagName: v__VERSION__
           releaseName: 'TypeLink v__VERSION__'
           releaseBody: 'TypeLink release packages for macOS and Windows. Download the appropriate asset for your platform below.'
           releaseDraft: true
           prerelease: false
+
+      - name: Create Windows Portable ZIP
+        if: matrix.platform == 'windows-latest'
+        run: |
+          powershell Compress-Archive -Path desktop\src-tauri\target\release\typelink.exe -DestinationPath desktop\src-tauri\target\release\typelink_windows_x64_portable.zip
+
+      - name: Upload Windows Portable ZIP to Release
+        if: matrix.platform == 'windows-latest'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: desktop/src-tauri/target/release/typelink_windows_x64_portable.zip
+          tag_name: v${{ steps.tauri_build.outputs.appVersion }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
