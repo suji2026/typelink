@@ -1,0 +1,47 @@
+name: 'publish'
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch: # Allows manual trigger from GitHub Actions UI
+
+jobs:
+  publish-tauri:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: 'macos-latest'
+          - platform: 'windows-latest'
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
+      - name: Install Rust Stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Frontend Dependencies
+        run: |
+          cd desktop
+          npm install
+
+      - name: Build and Publish Tauri Application
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: './desktop'
+          tagName: v__VERSION__
+          releaseName: 'TypeLink v__VERSION__'
+          releaseBody: 'TypeLink release packages for macOS and Windows. Download the appropriate asset for your platform below.'
+          releaseDraft: true
+          prerelease: false
