@@ -8,30 +8,66 @@
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: #1a1a2e;
-      color: #eee;
+      background: #f9fafb;
+      color: #111827;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
       height: 100vh;
-      padding: 24px;
+      padding: 16px;
     }
-    h2 { font-size: 16px; margin-bottom: 16px; color: #ccc; }
-    #qr-img { width: 260px; height: 260px; border-radius: 12px; background: #16213e; }
-    .url {
-      margin-top: 16px; font-size: 13px; color: #888;
-      word-break: break-all; text-align: center;
-      max-width: 280px;
-      user-select: all;
+    h2 { font-size: 15px; margin-bottom: 12px; color: #374151; }
+    #qr-img { 
+      width: 230px; 
+      height: 230px; 
+      border-radius: 16px; 
+      background: #ffffff; 
+      padding: 12px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+      border: 1px solid rgba(0, 0, 0, 0.02);
+    }
+
+    .select-container {
+      margin-top: 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 100%;
+      max-width: 240px;
+    }
+    .ip-select {
+      width: 100%;
+      padding: 6px 32px 6px 12px;
+      font-size: 13px;
+      color: #374151;
+      background: #ffffff;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      outline: none;
+      cursor: pointer;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      appearance: none;
+      -webkit-appearance: none;
+      background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      background-size: 14px;
+    }
+    .ip-select:hover {
+      border-color: #3b82f6;
+    }
+    .ip-select:focus {
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
     }
 
     .error { color: #e94560; font-size: 14px; }
     .status {
       margin-top: 12px;
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 500;
-      color: #888;
+      color: #9ca3af;
       transition: color 0.2s;
     }
   </style>
@@ -39,21 +75,73 @@
 <body>
   <h2>📱 手机扫码连接</h2>
   <img id="qr-img" src="" alt="QR Code">
-  <p class="url" id="url-text"></p>
+
+  <div class="select-container">
+    <select id="ip-select" class="ip-select">
+      <!-- 动态加载 -->
+    </select>
+  </div>
 
   <p class="status" id="status">等待连接...</p>
   <p class="error" id="error" style="display:none"></p>
 
   <script>
+    var selectedIp = '';
+    var firstLoad = true;
+
     function updateStatus() {
-      fetch('/api/qr')
+      var url = '/api/qr';
+      if (selectedIp) {
+        url += '?ip=' + encodeURIComponent(selectedIp);
+      }
+
+      fetch(url)
         .then(function(r) { return r.json(); })
         .then(function(data) {
           document.getElementById('qr-img').src = data.dataUrl;
-          document.getElementById('url-text').textContent = data.url;
+          var urlTextEl = document.getElementById('url-text');
+          if (urlTextEl) {
+            urlTextEl.textContent = data.url;
+          }
           
+          var selectEl = document.getElementById('ip-select');
+          if (selectEl) {
+            var currentOptionsCount = selectEl.options.length;
+            var newIPs = data.allIPs || [];
+            
+            var shouldRebuild = firstLoad || currentOptionsCount !== newIPs.length;
+            if (!shouldRebuild && newIPs.length > 0) {
+              for (var i = 0; i < newIPs.length; i++) {
+                if (selectEl.options[i].value !== newIPs[i].ip) {
+                  shouldRebuild = true;
+                  break;
+                }
+              }
+            }
+            
+            if (shouldRebuild) {
+              selectEl.innerHTML = '';
+              newIPs.forEach(function(ipInfo) {
+                var opt = document.createElement('option');
+                opt.value = ipInfo.ip;
+                opt.textContent = ipInfo.ip + ' (' + ipInfo.label + ')';
+                selectEl.appendChild(opt);
+              });
+              
+              if (!selectedIp && newIPs.length > 0) {
+                try {
+                  var urlObj = new URL(data.url);
+                  selectedIp = urlObj.hostname;
+                } catch(e) {
+                  var match = data.url.match(/https?:\/\/([^:/]+)/);
+                  selectedIp = match ? match[1] : newIPs[0].ip;
+                }
+              }
+              selectEl.value = selectedIp;
+              firstLoad = false;
+            }
+          }
 
-          
           var statusEl = document.getElementById('status');
           if (data.connected) {
             statusEl.textContent = '已连接 ✓';
@@ -68,6 +156,11 @@
           document.getElementById('error').textContent = '生成二维码失败: ' + err.message;
         });
     }
+
+    document.getElementById('ip-select').addEventListener('change', function(e) {
+      selectedIp = e.target.value;
+      updateStatus();
+    });
     
     updateStatus();
     setInterval(updateStatus, 1000);

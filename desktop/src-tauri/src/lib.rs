@@ -2,7 +2,7 @@ use tauri::Manager;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::TrayIconBuilder;
 use axum::{
-    extract::{State, ws::{WebSocket, WebSocketUpgrade, Message}},
+    extract::{State, Query, ws::{WebSocket, WebSocketUpgrade, Message}},
     response::{IntoResponse, Html},
     routing::get,
     Router,
@@ -28,26 +28,106 @@ struct AppState {
     app_handle: tauri::AppHandle,
 }
 
-fn get_all_ips() -> Vec<String> {
-    let mut ips = Vec::new();
+#[derive(Serialize, Clone)]
+struct IpInfo {
+    ip: String,
+    name: String,
+    label: String,
+}
+
+fn guess_interface_type(name: &str, ip: &str) -> String {
+    let name_lower = name.to_lowercase();
+    let ip_parts: Vec<&str> = ip.split('.').collect();
+    
+    if ip_parts.len() == 4 {
+        if ip_parts[0] == "198" && (ip_parts[1] == "18" || ip_parts[1] == "19") {
+            return "代理/VPN 网卡 (Clash/TUN)".to_string();
+        }
+        if ip_parts[0] == "169" && ip_parts[1] == "254" {
+            return "本地链路 (无网络)".to_string();
+        }
+    }
+
+    if name_lower.contains("wi-fi") || name_lower.contains("wifi") || name_lower == "en0" {
+        "无线网卡 (Wi-Fi)".to_string()
+    } else if name_lower.contains("ethernet") || name_lower.contains("以太网") || name_lower.contains("en") {
+        "有线网卡 (Ethernet)".to_string()
+    } else if name_lower.contains("local area connection*") || name_lower.contains("本地连接*") {
+        "移动热点 (Mobile Hotspot)".to_string()
+    } else if name_lower.contains("virtual") || name_lower.contains("vethernet") || name_lower.contains("wsl") {
+        "虚拟网卡 (Virtual)".to_string()
+    } else if name_lower.contains("vpn") || name_lower.contains("tun") || name_lower.contains("tap") || name_lower.contains("clash") {
+        "代理/VPN 网卡".to_string()
+    } else {
+        format!("网卡 {}", name)
+    }
+}
+
+fn ip_score(ip_str: &str, name: &str) -> i32 {
+    let name_lower = name.to_lowercase();
+    let parts: Vec<&str> = ip_str.split('.').collect();
+    if parts.len() != 4 {
+        return 0;
+    }
+    let p0: u8 = parts[0].parse().unwrap_or(0);
+    let p1: u8 = parts[1].parse().unwrap_or(0);
+
+    // 首先排除虚拟网卡和 VPN
+    if name_lower.contains("virtual") || name_lower.contains("vethernet") || name_lower.contains("wsl") {
+        return 20;
+    }
+    if name_lower.contains("vpn") || name_lower.contains("tun") || name_lower.contains("tap") || name_lower.contains("clash") {
+        return 10;
+    }
+
+    match (p0, p1) {
+        (192, 168) => {
+            // 如果是 192.168.137.x，说明是 Windows 移动热点，排在常规物理局域网后面一些
+            if p1 == 168 && parts[2] == "137" {
+                75
+            } else {
+                100
+            }
+        }
+        (10, _) => 90,
+        (172, x) if (16..=31).contains(&x) => 80,
+        (198, 18) | (198, 19) => 5, // Clash TUN
+        (169, 254) => 1, // 链路本地
+        (127, _) => 0,
+        _ => 50,
+    }
+}
+
+fn get_all_ips_sorted() -> Vec<IpInfo> {
+    let mut ip_infos = Vec::new();
     if let Ok(ifaces) = get_if_addrs() {
         for iface in ifaces {
             if !iface.is_loopback() {
                 if let IpAddr::V4(ipv4) = iface.addr.ip() {
-                    ips.push(ipv4.to_string());
+                    let ip = ipv4.to_string();
+                    let name = iface.name.clone();
+                    let label = guess_interface_type(&name, &ip);
+                    ip_infos.push(IpInfo { ip, name, label });
                 }
             }
         }
     }
-    if ips.is_empty() {
-        ips.push("127.0.0.1".to_string());
-    }
-    ips
-}
+    
+    // 按打分降序排列
+    ip_infos.sort_by(|a, b| {
+        let score_a = ip_score(&a.ip, &a.name);
+        let score_b = ip_score(&b.ip, &b.name);
+        score_b.cmp(&score_a)
+    });
 
-fn get_local_ip() -> String {
-    let ips = get_all_ips();
-    ips.first().cloned().unwrap_or_else(|| "127.0.0.1".to_string())
+    if ip_infos.is_empty() {
+        ip_infos.push(IpInfo {
+            ip: "127.0.0.1".to_string(),
+            name: "lo".to_string(),
+            label: "本地回环".to_string(),
+        });
+    }
+    ip_infos
 }
 
 fn generate_qr_svg(url: &str) -> Result<String, String> {
@@ -208,15 +288,23 @@ struct QrResponse {
     #[serde(rename = "clientCount")]
     client_count: usize,
     #[serde(rename = "allIPs")]
-    all_ips: Vec<String>,
+    all_ips: Vec<IpInfo>,
 }
 
-async fn qr_api_handler(State(state): State<AppState>) -> Json<QrResponse> {
-    let local_ip = get_local_ip();
-    let url = format!("http://{}:9527", local_ip);
+async fn qr_api_handler(
+    State(state): State<AppState>,
+    Query(params): Query<std::collections::HashMap<String, String>>,
+) -> Json<QrResponse> {
+    let all_ips = get_all_ips_sorted();
+    
+    let selected_ip = params.get("ip")
+        .filter(|ip| all_ips.iter().any(|info| &info.ip == *ip))
+        .cloned()
+        .unwrap_or_else(|| all_ips.first().map(|info| info.ip.clone()).unwrap_or_else(|| "127.0.0.1".to_string()));
+
+    let url = format!("http://{}:9527", selected_ip);
     let data_url = generate_qr_svg(&url).unwrap_or_default();
     let client_count = state.client_count.load(Ordering::SeqCst);
-    let all_ips = get_all_ips();
 
     Json(QrResponse {
         url,

@@ -57,19 +57,26 @@ function startServer(port = 9527) {
 
   app.use(express.static(path.join(__dirname, 'public')));
 
-  app.get('/api/qr', async (_req, res) => {
+  app.get('/api/qr', async (req, res) => {
     try {
       const ips = getLocalIPs();
-      const mainIP = ips.length > 0 ? ips[0] : '127.0.0.1';
-      const url = `http://${mainIP}:${port}`;
+      const selectedIP = req.query.ip || (ips.length > 0 ? ips[0] : '127.0.0.1');
+      const url = `http://${selectedIP}:${port}`;
       const dataUrl = await QRCode.toDataURL(url);
       const clientCount = [...wss.clients].filter(c => c.readyState === 1).length;
+      
+      const allIPs = ips.map(ip => ({
+        ip,
+        name: 'LAN',
+        label: ip.startsWith('192.168.137.') ? '移动热点 (Mobile Hotspot)' : '本地局域网 (LAN)'
+      }));
+
       res.json({ 
         url, 
         dataUrl,
         connected: clientCount > 0,
         clientCount,
-        allIPs: ips
+        allIPs
       });
     } catch {
       res.status(500).json({ error: 'QR generation failed' });
