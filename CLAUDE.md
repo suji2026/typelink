@@ -27,6 +27,6 @@ Use your phone as a voice input source for your desktop computer. The desktop ap
   - Colors indicate status: Gray `#808080` (disconnected) and Green `#16a34a` (connected).
 - **Tauri Config**:
   - `devUrl` is removed from `tauri.conf.json` so that `tauri dev` compiles and starts the backend immediately without waiting for an external dev server.
-- **Windows Adapter Names**:
-  - `if_addrs` returns GUIDs (e.g., `{CD9E4015-...}`) on Windows. We must query the Windows registry key `SYSTEM\CurrentControlSet\Control\Network\{4D36E972-E325-11CE-BFC1-08002BE10318}\<GUID>\Connection` -> `Name` to translate GUIDs to user-friendly names before matching/scoring.
-  - To avoid compilation warnings (`unused_mut`) on non-Windows platforms, use variable shadowing rather than mutable bindings for this translation.
+- **Windows Network Adapter Friendly Name**:
+  - Windows network adapter names returned by `if_addrs` are adapter GUIDs. To display human-friendly names (e.g. `WLAN`, `以太网`) and classify them correctly, the app queries the registry path `SYSTEM\CurrentControlSet\Control\Network\{4D36E972-E325-11CE-BFC1-08002BE10318}\<GUID>\Connection` -> value `Name` under `cfg(target_os = "windows")`.
+

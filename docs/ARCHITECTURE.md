@@ -31,4 +31,5 @@ Written in Rust with the Tauri v2 framework:
 - **Keyboard paste simulation**: Pastes the clipboard contents.
 - **macOS main-thread dispatcher**: Since keyboard simulation queries system keyboard layout configuration, it must be run on the macOS main queue to avoid thread-safety assertions. Dispatched via `app_handle.run_on_main_thread`.
 - **Dynamic Tray Icon**: Dynamically generates a 16x16 pixel representation of "TL" in Rust and sets it as the system tray icon, updating the color dynamically to gray (disconnected) or green (connected).
-- **Windows Adapter Friendly Name Translation**: On Windows, `if_addrs` returns interface names as GUIDs. The backend retrieves the human-friendly names (e.g., "WLAN", "以太网") by querying the registry key `SYSTEM\CurrentControlSet\Control\Network\{4D36E972-E325-11CE-BFC1-08002BE10318}\<GUID>\Connection` -> `Name`, ensuring accurate user display and adapter type matching.
+- **Windows Network Adapter Name Resolution**: Resolves adapter GUIDs returned by `if_addrs` to human-friendly names (e.g. `WLAN`, `以太网`) on Windows by querying the registry (`HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Network\{4D36E972-E325-11CE-BFC1-08002BE10318}\<GUID>\Connection`). This enables correct sorting and classification of wireless, wired, virtual, and VPN network interfaces.
+
