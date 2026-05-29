@@ -1,6 +1,6 @@
 [package]
 name = "typelink"
-version = "0.1.0"
+version = "1.0.2"
 description = "TypeLink App"
 authors = ["zhangjian"]
 edition = "2021"
@@ -26,3 +26,6 @@ arboard = "3"
 qrcode = { version = "0.14", default-features = false, features = ["svg"] }
 base64 = "0.21"
 if-addrs = "0.7"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+winreg = "0.52"

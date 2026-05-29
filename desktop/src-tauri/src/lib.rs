@@ -35,6 +35,23 @@ struct IpInfo {
     label: String,
 }
 
+#[cfg(target_os = "windows")]
+fn get_windows_friendly_name(guid: &str) -> Option<String> {
+    use winreg::enums::HKEY_LOCAL_MACHINE;
+    use winreg::RegKey;
+    let hk_lm = RegKey::predef(HKEY_LOCAL_MACHINE);
+    let subkey_path = format!(
+        r"SYSTEM\CurrentControlSet\Control\Network\{{4D36E972-E325-11CE-BFC1-08002BE10318}}\{}\Connection",
+        guid
+    );
+    if let Ok(key) = hk_lm.open_subkey(subkey_path) {
+        if let Ok(name) = key.get_value::<String, _>("Name") {
+            return Some(name);
+        }
+    }
+    None
+}
+
 fn guess_interface_type(name: &str, ip: &str) -> String {
     let name_lower = name.to_lowercase();
     let ip_parts: Vec<&str> = ip.split('.').collect();
@@ -48,12 +65,12 @@ fn guess_interface_type(name: &str, ip: &str) -> String {
         }
     }
 
-    if name_lower.contains("wi-fi") || name_lower.contains("wifi") || name_lower == "en0" {
+    if name_lower.contains("wi-fi") || name_lower.contains("wifi") || name_lower.contains("wlan") || name_lower.contains("无线") || name_lower == "en0" {
         "无线网卡 (Wi-Fi)".to_string()
-    } else if name_lower.contains("ethernet") || name_lower.contains("以太网") || name_lower.contains("en") {
-        "有线网卡 (Ethernet)".to_string()
     } else if name_lower.contains("local area connection*") || name_lower.contains("本地连接*") {
         "移动热点 (Mobile Hotspot)".to_string()
+    } else if name_lower.contains("ethernet") || name_lower.contains("以太网") || name_lower.contains("en") || name_lower.contains("本地连接") || name_lower.contains("local area connection") {
+        "有线网卡 (Ethernet)".to_string()
     } else if name_lower.contains("virtual") || name_lower.contains("vethernet") || name_lower.contains("wsl") {
         "虚拟网卡 (Virtual)".to_string()
     } else if name_lower.contains("vpn") || name_lower.contains("tun") || name_lower.contains("tap") || name_lower.contains("clash") {
@@ -106,6 +123,8 @@ fn get_all_ips_sorted() -> Vec<IpInfo> {
                 if let IpAddr::V4(ipv4) = iface.addr.ip() {
                     let ip = ipv4.to_string();
                     let name = iface.name.clone();
+                    #[cfg(target_os = "windows")]
+                    let name = get_windows_friendly_name(&name).unwrap_or(name);
                     let label = guess_interface_type(&name, &ip);
                     ip_infos.push(IpInfo { ip, name, label });
                 }
